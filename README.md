@@ -1,4 +1,18 @@
-# pyasm100
+# pyASM100
+
+Python ports of the RSX-11 FORTRAN toolchain for the Floating Point
+Systems FPS-100 array processor, all built to run under `py -3.11`:
+
+- **`pyasm100`** (this document) — the cross-assembler, a near-1:1 port
+  of `ASM100.FTN` with one module per original FORTRAN subroutine.
+- **[`pyld100`](pyld100/README.md)** — a linker for `pyasm100`'s `.APO`
+  object files, emitting the PS/MD text that
+  [`asm2lm.py`](asm2lm.py) turns into a pySIM100 load module. New code
+  (APLOAD, the real 1979 linker, doesn't survive as a clean, complete
+  source file to port), grounded in real APLOAD relocation logic where
+  one exists — see its own README for what's ported vs. new.
+
+## pyasm100
 
 A near-1:1 Python port of `ASM100.FTN`, the RSX-11 FORTRAN cross-assembler
 for the Floating Point Systems FPS-100, ported to run under `py -3.11` with
@@ -119,7 +133,11 @@ structured Python.
 ## Testing
 
 Every module was verified individually as it was ported (see the git
-history for what was checked). The full pipeline has been run end-to-end
-through the real `py -3.11 -m pyasm100` entry point against small
-hand-written APAL source. It has not yet been run against a large,
-real-world APAL program.
+history for what was checked). Beyond that, the full pipeline has been
+run end-to-end against `APFSRC.APS` — a real, 2386-line APAL scalar-math
+library — and its object-file output diffed against a real reference
+object file (`APFLIB.APO`) produced by the original tool. After fixing
+two real bugs the diff turned up (an inverted S-PAD range check in
+`gfield.py`, and an incorrect location-counter reassignment in `pass2.py`
+at the `$LOC`/`$END` flush points), the two are byte-for-byte identical
+aside from CRLF-vs-LF line endings.
