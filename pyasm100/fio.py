@@ -101,12 +101,15 @@ UNITS = IoUnits()
 def _arr_to_filename(namearr: FArray) -> str:
     """Build a filename string from a LENGTH-formatted buffer: slot 1 holds
     the character count, slot 2.. hold the characters (see length.py --
-    every INFILE(1/2, ...) call site in the source calls LENGTH first)."""
+    every INFILE(1/2, ...) call site in the source calls LENGTH first).
+    Each character slot holds an A1-style Hollerith word (char in the low
+    byte, blank in the high byte -- see hollerith.py), not a raw ASCII
+    code, so it's unpacked with unholl(..., 1)."""
     n = namearr[1]
     if not isinstance(n, int) or n <= 0:
         return ""
     n = min(n, len(namearr) - 1)
-    return "".join(chr(namearr[i]) for i in range(2, 2 + n))
+    return "".join(unholl(namearr[i], 1) for i in range(2, 2 + n))
 
 
 def infile(mode: int, namearr: FArray, lun: int) -> int:
@@ -287,7 +290,7 @@ def fwrite_lines(tokens: list[tuple], values: list) -> list[str]:
             for _ in range(repeat):
                 v = values[vi]
                 vi += 1
-                cur.append(chr(v & 0x7F) if width == 1 else unholl(v, width))
+                cur.append(unholl(v, width))
     lines.append("".join(cur))
     return lines
 
@@ -318,10 +321,10 @@ def fread_line(line: str, tokens: list[tuple]) -> list:
             for _ in range(repeat):
                 field = line[pos : pos + width]
                 pos += width
-                if width == 1:
-                    values.append(ord(field[0]) if field else ord(" "))
-                else:
-                    values.append(holl(field.ljust(width)[:2]))
+                # Aw with w < storage width (2 bytes/word here) left-justifies
+                # the characters read and blank-fills the rest of the word --
+                # not a raw ASCII code. holl() blank-pads to 2 chars the same way.
+                values.append(holl(field[:2]))
     return values
 
 

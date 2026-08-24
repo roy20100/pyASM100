@@ -10,16 +10,15 @@ reads exactly this counted-string layout.
 
 from __future__ import annotations
 
+from .common import G
 from .farray import FArray
-
-_BLANK = ord(" ")
 
 
 def length(buf: FArray) -> None:
     id_ = 1
     for i in range(1, 31):
         id_ = 31 - i
-        if buf[id_] != _BLANK:
+        if buf[id_] != G.BLANK:
             break
     for i in range(1, id_ + 1):
         j = (id_ + 1) - i
