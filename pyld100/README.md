@@ -38,15 +38,18 @@ py asm2lm.py -m stem.md2 --vtype 2 -o data.lm   # if stem.md2 exists
 
 ## Where this comes from
 
-`APLOAD` doesn't exist as its own file. Roughly 39 of its subroutines
-turned out to be preserved — mislabeled — inside `LED100.FTN` (nominally
-the unrelated Library Editor), identifiable by their own header comments
-("THIS VERSION OF APLOAD WAS PRODUCED BY CROCK..."). That source is real,
-but not cleanly portable as a whole:
+`APLOAD` doesn't exist as its own file. Of `LED100.FTN`'s 43 named
+subroutines, 40 turned out to be `APLOAD` code, misfiled under the
+unrelated Library Editor's name — identifiable because each one's own
+header comment says which program it's really from ("THIS VERSION OF
+**APLOAD** WAS PRODUCED BY CROCK...", vs. "...OF **APLED**..." for the 2
+genuine Library Editor routines actually in there). A 43rd banner,
+`PAKSTR`, is a bare comment line with no header and no body at all — one
+routine name that didn't survive whatever produced this archive, sitting
+right next to 42 that did.
 
-- Several utilities it calls constantly (`EXTTOK`, `STOI`, `EXTVT`,
-  `EXTST`, `SRCST`, `UPAKS`, `INSCS`, `WRTLIN`) are referenced everywhere
-  and defined nowhere in the surviving file.
+That recovered source is real, but still not cleanly portable as a whole:
+
 - Its core loader (`LOAD1`, ~940 lines) has overlay/task/ISR handling
   woven directly into its control flow, not separable from plain linking.
 - Its data-relocation path (`DTALNK`/`DTAREL`) reads APLOAD's own internal
@@ -54,13 +57,35 @@ but not cleanly portable as a whole:
 - There's no real APLOAD output anywhere to diff a full port against —
   unlike `pyasm100`, which was verified byte-for-byte against a real
   reference object file.
+- It also constantly calls a couple dozen small string/table utilities
+  (`EXTTOK`, `STOI`, `SRCST`, `EXTVT`, `EXTST`, `INSST`, `RPLVT`, `RMVET`,
+  `LENT`, `INSCS`, `EXTSS`, `RPLIS`, `RMVCS`, `INTT`, `CMPSS`, `IADDC`,
+  `RPLST`, `SRCCS`, and a few more) that are defined nowhere in
+  `LED100.FTN` itself. A later, separately-acquired archive of found FPS
+  source (large — kept outside this repo, see `.gitignore`) turned out to
+  contain them after all: they're real, complete routines in that
+  archive's `IUTIL.FTN` ("INDEPENDENT UTILITIES" — a self-described
+  generic string/table library, not APLOAD-specific, shared across
+  several of the tools in that archive). Only 4 names LED100.FTN calls —
+  `TABGET`, `UPAKS`, `WRTLIN`, `RDLIN` — stayed unaccounted for even
+  there; the last two turned out to be called by `IUTIL.FTN` itself
+  without being defined in it either, so they're missing from a layer
+  below IUTIL, not specific to APLOAD.
 
 So `pyld100` reuses only what's directly grounded and independently
 checkable: the relocation-address (`VAL`) formulas from `LINKUP` (code
 words, `LED100.FTN` ~2668-2810) and `DTAREL` (data records, ~992-1097),
-reproduced in `relocate.py`. Everything else — the `.APO` reader, the
-symbol table, link orchestration, PS/MD emission, the CLI — is new code,
-because the equivalent APLOAD pieces are either missing, tangled up with
+reproduced in `relocate.py`. Note that even that reused logic isn't a
+literal, complete transcription: the real `VAL` computation calls
+`EXTST`/`SRCST`/`EXTVT` to look an external symbol's value up by name in
+APLOAD's own in-memory tables. `relocate.py` ports the *arithmetic and
+branch structure* around those calls (which TYPEN does what, the RELTYP
+bitmask, the PC-relative subtraction) but not the calls themselves —
+`symtab.py` does that lookup with a plain Python `dict` instead, the same
+way `pyasm100` reimplemented `INFILE`/`DATTIM` from their contract rather
+than their body. Everything else here — the `.APO` reader, the symbol
+table, link orchestration, PS/MD emission, the CLI — is new code, because
+the equivalent APLOAD pieces are either missing, tangled up with
 out-of-scope features, or targeting a format that doesn't apply here.
 
 ## Module map
