@@ -232,7 +232,11 @@ def _read_dbib(line: str) -> DataRecord:
     # first to pick the branch, matching pass2.py's l1850 dispatch.
     if tok[2] == "2":
         rptcnt = int(tok[3], 8)
-        text = " ".join(tok[4:]).strip()
+        # RTOE fills unused mantissa-digit slots with blanks (not zeros),
+        # so the raw text can read e.g. "3.14   E+00" -- join with no
+        # separator (RTOE's own digits never contain embedded blanks) so
+        # the result stays a plain float()-parseable numeral.
+        text = "".join(tok[4:])
         return DataRecord(id=id_, index=index, rptcnt=rptcnt, type=2, text=text)
 
     typ = int(tok[2], 8)
