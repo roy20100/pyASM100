@@ -97,9 +97,9 @@ def gfield(ifld: int, iret: Box) -> None:
         return l3000
 
     def l130():
-        if G.IVAL != 0:
-            return l150
-        return l140
+        if G.IVAL < 0:
+            return l140
+        return l150
 
     def l140():
         errmes(4)
@@ -133,9 +133,9 @@ def gfield(ifld: int, iret: Box) -> None:
         return l200
 
     def l200():
-        if G.IVAL != 0:
-            return l210
-        return l140
+        if G.IVAL < 0:
+            return l140
+        return l210
 
     def l210():
         if G.IVAL - 15 > 0:
@@ -172,9 +172,9 @@ def gfield(ifld: int, iret: Box) -> None:
         return l310
 
     def l310():
-        if G.IVAL != 0:
-            return l320
-        return l140
+        if G.IVAL < 0:
+            return l140
+        return l320
 
     def l320():
         if G.IVAL - 15 > 0:

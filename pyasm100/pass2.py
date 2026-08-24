@@ -242,11 +242,12 @@ def pass2() -> None:
         return l5400
 
     def l520():
-        nonlocal mloc
         G.LOCNT = G.IVAL
         if iwct <= 0:
             return l5400
-        mloc = G.LOCNT
+        # Flush using MLOC as it already stands (set back when this block
+        # was opened, at l5020) -- the source does NOT reassign MLOC here,
+        # it just flushed the block that's ending before LOCNT moves on.
         flush_block()
         return l5400
 
@@ -1075,10 +1076,11 @@ def pass2() -> None:
         return l5520
 
     def l5520():
-        nonlocal mloc
+        # As in l520: the source does not reassign MLOC here either, it
+        # just flushes the final block using MLOC as set when that block
+        # was opened (l5020).
         if iwct <= 0:
             return l5540
-        mloc = G.LOCNT
         flush_block()
         return l5540
 
