@@ -99,14 +99,14 @@ UNITS = IoUnits()
 
 
 def _arr_to_filename(namearr: FArray) -> str:
-    """Build a filename string from a blank-padded A1 char-code array."""
-    chars = []
-    for i in range(1, len(namearr) + 1):
-        c = namearr[i]
-        if c in (0, 32):  # NUL or blank ends the name
-            break
-        chars.append(chr(c))
-    return "".join(chars).strip()
+    """Build a filename string from a LENGTH-formatted buffer: slot 1 holds
+    the character count, slot 2.. hold the characters (see length.py --
+    every INFILE(1/2, ...) call site in the source calls LENGTH first)."""
+    n = namearr[1]
+    if not isinstance(n, int) or n <= 0:
+        return ""
+    n = min(n, len(namearr) - 1)
+    return "".join(chr(namearr[i]) for i in range(2, 2 + n))
 
 
 def infile(mode: int, namearr: FArray, lun: int) -> int:
