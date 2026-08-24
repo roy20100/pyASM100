@@ -35,6 +35,22 @@ from .hollerith import holl, unholl
 CONSOLE_LUN = 5
 
 
+def _norm(lun: int) -> int:
+    """ASM100.FTN addresses the same physical file under two different LUN
+    numbers at different points: APALI opens each file (INFILE modes 1/2/7)
+    under a small "raw" LUN (1-4), then adds 7 to SLUN/OLUN/LLUN/TLUN
+    ("MAP LOGICAL UNIT NUMBERS HERE IF NECESSARY") for every subsequent
+    READ/WRITE -- except the rewind calls, which subtract 7 right back off
+    before calling INFILE(6,...), addressing the original raw LUN again.
+    This +7 dance is host-specific RSX-11 channel-mapping scaffolding with
+    no meaning for a Python file registry, so every unit operation here
+    normalizes lun>=8 down by 7, making the raw and mapped numbers refer
+    to the same registry entry. Console unit 5 is below the threshold and
+    always passes through unchanged.
+    """
+    return lun - 7 if lun >= 8 else lun
+
+
 # ---------------------------------------------------------------------------
 # Logical unit registry
 # ---------------------------------------------------------------------------
@@ -46,6 +62,7 @@ class IoUnits:
         self._paths: dict[int, str] = {}
 
     def open_read(self, lun: int, path: str) -> bool:
+        lun = _norm(lun)
         try:
             f = open(path, "r", newline="")
         except OSError:
@@ -55,6 +72,7 @@ class IoUnits:
         return True
 
     def open_write(self, lun: int, path: str) -> bool:
+        lun = _norm(lun)
         try:
             f = open(path, "w", newline="")
         except OSError:
@@ -64,6 +82,7 @@ class IoUnits:
         return True
 
     def open_scratch(self, lun: int) -> bool:
+        lun = _norm(lun)
         f = tempfile.NamedTemporaryFile(
             mode="w+", newline="", suffix=".tmp", delete=False
         )
@@ -72,12 +91,14 @@ class IoUnits:
         return True
 
     def close(self, lun: int) -> None:
+        lun = _norm(lun)
         f = self._files.pop(lun, None)
         self._paths.pop(lun, None)
         if f is not None:
             f.close()
 
     def close_delete(self, lun: int) -> None:
+        lun = _norm(lun)
         path = self._paths.pop(lun, None)
         f = self._files.pop(lun, None)
         if f is not None:
@@ -86,13 +107,13 @@ class IoUnits:
             os.remove(path)
 
     def rewind(self, lun: int) -> None:
-        f = self._files.get(lun)
+        f = self._files.get(_norm(lun))
         if f is not None:
             f.flush()
             f.seek(0)
 
     def get(self, lun: int):
-        return self._files[lun]
+        return self._files[_norm(lun)]
 
 
 UNITS = IoUnits()
