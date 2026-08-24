@@ -11,12 +11,20 @@ Systems FPS-100 array processor, all built to run under `py -3.11`:
   (APLOAD, the real 1979 linker, doesn't survive as a clean, complete
   source file to port), grounded in real APLOAD relocation logic where
   one exists — see its own README for what's ported vs. new.
+- **[`ps_md_to_c.py`](ps_md_to_c.py)** — converts `pyld100`'s PS/MD text
+  output into a plain C header (flat data arrays plus base-address/size
+  `#define`s), for targets with no relation to the original PDP-11/RSX-11
+  toolchain — e.g. a custom non-PDP-11 host driving the AP over its own
+  DMA interface.
 
 ## pyasm100
 
 A near-1:1 Python port of `ASM100.FTN`, the RSX-11 FORTRAN cross-assembler
 for the Floating Point Systems FPS-100, ported to run under `py -3.11` with
-one module per original FORTRAN subroutine/function.
+one module per original FORTRAN subroutine/function. See
+[`pyasm100/USAGE.md`](pyasm100/USAGE.md) for a practical guide to writing
+APAL source and reading the assembler's output — pseudo-ops, number
+literal syntax, the full error-message table, and a worked example.
 
 ## Running it
 
