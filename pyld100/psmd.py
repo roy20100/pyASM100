@@ -87,7 +87,16 @@ def relocate_data(
     is pass1.py's `comcnt` -- a 1-based counter of $COMMON blocks in the
     order they were declared in that module. So a module's data records
     are matched against its common_blocks list by *position*, not by
-    comparing id fields."""
+    comparing id fields.
+
+    A record's rptcnt (from $DATA's "sym(index)/count value" repeat-count
+    syntax -- see pyasm100/USAGE.md) means "the same value, written at
+    rptcnt consecutive addresses starting at index" -- confirmed
+    empirically (see git history): assembling a repeat-count $DATA
+    statement produces exactly one ***DBIB record carrying rptcnt as a
+    field, so the *linker* is the one that has to expand it, matching
+    asm2lm.py's own MD format, which has no repeat concept at all (one
+    line per address)."""
     common_index: dict[int, dict[int, str]] = {}
     for m in modules:
         common_index[id(m)] = {i + 1: cb.name.strip() for i, cb in enumerate(m.common_blocks)}
@@ -116,7 +125,8 @@ def relocate_data(
                 val = 0
 
             if base_type == 2:
-                out.append(MdEntry(addr=addr, type=2, text=rec.text))
+                for k in range(rec.rptcnt):
+                    out.append(MdEntry(addr=addr + k, type=2, text=rec.text))
             elif base_type == 4:
                 # rec.exponent/hmant/value are GFIELD's AP-internal triple
                 # encoding (see gfield.py); asm2lm.py's --vtype 4 expects
@@ -132,7 +142,8 @@ def relocate_data(
                 )
             else:  # integer
                 value = iadd16(rec.value, val) if val else rec.value
-                out.append(MdEntry(addr=addr, type=1, value=value))
+                for k in range(rec.rptcnt):
+                    out.append(MdEntry(addr=addr + k, type=1, value=value))
     return out
 
 

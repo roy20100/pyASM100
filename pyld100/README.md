@@ -162,6 +162,14 @@ is layered:
   are unchanged (still parsed correctly) but shouldn't be compared to each
   other for anything.
 
+  A second bug surfaced the same way, testing `$DATA`'s repeat-count
+  table-fill syntax (`sym(index)/count value` -- see `pyasm100/USAGE.md`):
+  `relocate_data` was emitting exactly one `MdEntry` per `DataRecord`
+  regardless of `rptcnt`, silently dropping a repeated fill down to its
+  first element. `asm2lm.py`'s MD format has no repeat concept at all (one
+  line per address), so the repeat has to be expanded into `rptcnt`
+  separate consecutive-address entries by the linker -- now fixed.
+
 `TYPEN 1`/`3`/`4`, the triple-`$DATA` path, and cross-module `$COMMON`
 matching remain unverified against real data — see "Known gaps." If a
 real linked reference (or a `.APO` file exercising any of those) ever
