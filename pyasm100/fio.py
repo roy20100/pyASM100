@@ -133,12 +133,21 @@ def infile(mode: int, namearr: FArray, lun: int) -> int:
 
 
 def dattim(times: FArray) -> None:
+    """Fill TIMES(1..5) with [month, day, year, hour, minute] as plain
+    two-digit-ish integers. HEADER (not DATTIM) is what splits each into
+    tens/ones digits and %100-corrects the year -- confirmed by HEADER's
+    own code: 'TIMES(3)=TIMES(3)-INT(FLOAT(TIMES(3))/100.0)*100' then a
+    loop unpacking TIMES(1..5) into TIMES(1..10) digit pairs. TIMES(1)==0
+    is HEADER's sentinel for "clock unavailable"; Python's clock always
+    succeeds so that branch is unreachable here, but is preserved in
+    header.py for fidelity.
+    """
     now = datetime.datetime.now()
-    digits = "{:02d}{:02d}{:02d}{:02d}{:02d}".format(
-        now.month, now.day, now.year % 100, now.hour, now.minute
-    )
-    for i, ch in enumerate(digits, start=1):
-        times[i] = int(ch)
+    times[1] = now.month
+    times[2] = now.day
+    times[3] = now.year
+    times[4] = now.hour
+    times[5] = now.minute
 
 
 # ---------------------------------------------------------------------------
@@ -268,9 +277,15 @@ def _fmt_int(v: int, width: int) -> str:
 
 
 def fwrite_lines(tokens: list[tuple], values: list) -> list[str]:
+    """A WRITE stops as soon as its object list is exhausted, even if the
+    FORMAT has unconsumed value-taking descriptors left (e.g. WLIN's
+    FORMAT 500 declares 132A1 but the WRITE only ever supplies 100
+    values) -- so running out of values here ends output, it isn't an
+    error."""
     lines: list[str] = []
     cur: list[str] = []
     vi = 0
+    n = len(values)
     for tok in tokens:
         kind = tok[0]
         if kind == "SLASH":
@@ -283,14 +298,19 @@ def fwrite_lines(tokens: list[tuple], values: list) -> list[str]:
         elif kind == "I":
             _, width, repeat = tok
             for _ in range(repeat):
+                if vi >= n:
+                    lines.append("".join(cur))
+                    return lines
                 cur.append(_fmt_int(values[vi], width))
                 vi += 1
         elif kind == "A":
             _, width, repeat = tok
             for _ in range(repeat):
-                v = values[vi]
+                if vi >= n:
+                    lines.append("".join(cur))
+                    return lines
+                cur.append(unholl(values[vi], width))
                 vi += 1
-                cur.append(unholl(v, width))
     lines.append("".join(cur))
     return lines
 
