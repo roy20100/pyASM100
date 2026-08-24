@@ -103,7 +103,7 @@ def build_header(name, ps_entries=None, md_entries=None, md_vtype=1):
         out.append(f"#define {name}_PS_ADDR {base}")
         out.append(f"#define {name}_PS_SIZE {len(flat)}  /* words, 4 per PS location */")
         out.append("")
-        out.append(_emit_array(f"{name}_ps", "uint16_t", flat, _oct16))
+        out.append(_emit_array(f"{name}_ps", "uint16_t", flat, _oct16, per_line=4))
         out.append("")
 
     if md_entries is not None:
@@ -112,9 +112,9 @@ def build_header(name, ps_entries=None, md_entries=None, md_vtype=1):
         out.append(f"#define {name}_MD_SIZE {len(flat)}  /* elements */")
         out.append("")
         if md_vtype == 1:
-            out.append(_emit_array(f"{name}_md", "int16_t", flat, _signed16))
+            out.append(_emit_array(f"{name}_md", "int16_t", flat, _signed16, per_line=3))
         else:
-            out.append(_emit_array(f"{name}_md", "double", flat, repr))
+            out.append(_emit_array(f"{name}_md", "double", flat, repr, per_line=3))
         out.append("")
 
     out.append(f"#endif /* {guard} */")
