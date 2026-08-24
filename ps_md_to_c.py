@@ -19,9 +19,17 @@ Output, given a name of PROG:
     static const uint16_t PROG_ps[PROG_PS_SIZE] = { ... };
 
     #define PROG_MD_ADDR <base address>
-    #define PROG_MD_SIZE <element count>       (1 value per MD location)
-    static const int16_t PROG_md[PROG_MD_SIZE] = { ... };   (--vtype 1)
-    static const double PROG_md[PROG_MD_SIZE] = { ... };    (--vtype 2)
+    #define PROG_MD_SIZE <word count>
+    static const int16_t  PROG_md[PROG_MD_SIZE] = { ... };  (--vtype 1: 1 word/location)
+    static const uint16_t PROG_md[PROG_MD_SIZE] = { ... };  (--vtype 2: 3 words/location)
+
+--vtype 2 values are converted to the AP-120B's own native float words
+(exponent, high mantissa, low mantissa -- via asm2lm.py's _fpinpt(), a
+port of SIM100.FTN's real FPINPT routine) rather than emitted as a C
+double: the target is raw data DMA'd directly into AP memory, which
+expects its own float format already in place, not an IEEE double for
+some runtime FPINPT-equivalent step to convert (there is no such step
+without SIM100's own loader in the picture).
 
 If the input's addresses aren't contiguous, the gap is zero-filled (a
 flat C array can't represent a hole) and a warning is printed to stderr.
@@ -68,6 +76,13 @@ def _signed16(w):
     return str(w - 0x10000 if w >= 0x8000 else w)
 
 
+def _fp_words(v: float) -> tuple[int, int, int]:
+    """Decimal float -> (exp, mh, ml), the AP-120B's native 3-word float
+    (via asm2lm.py's _fpinpt -- see build_header's docstring note)."""
+    reg = asm2lm._fpinpt(v)
+    return (reg[0] << 8) | reg[1], (reg[2] << 8) | reg[3], (reg[4] << 8) | reg[5]
+
+
 def _emit_array(name, ctype, values, fmt, per_line=8):
     lines = [f"static const {ctype} {name}[{max(len(values), 1)}] = {{"]
     for i in range(0, len(values), per_line):
@@ -107,14 +122,23 @@ def build_header(name, ps_entries=None, md_entries=None, md_vtype=1):
         out.append("")
 
     if md_entries is not None:
-        base, flat = _fill(md_entries, 0, "MD")
-        out.append(f"#define {name}_MD_ADDR {base}")
-        out.append(f"#define {name}_MD_SIZE {len(flat)}  /* elements */")
-        out.append("")
         if md_vtype == 1:
+            base, flat = _fill(md_entries, 0, "MD")
+            out.append(f"#define {name}_MD_ADDR {base}")
+            out.append(f"#define {name}_MD_SIZE {len(flat)}  /* words, 1 per MD location */")
+            out.append("")
             out.append(_emit_array(f"{name}_md", "int16_t", flat, _signed16, per_line=3))
         else:
-            out.append(_emit_array(f"{name}_md", "double", flat, repr, per_line=3))
+            base, flat = _fill(md_entries, 0.0, "MD")
+            word_entries = []
+            for i, v in enumerate(flat):
+                for j, w in enumerate(_fp_words(v)):
+                    word_entries.append((i * 3 + j, w))
+            _, words = _fill(word_entries, 0, "MD (fpinpt words)")
+            out.append(f"#define {name}_MD_ADDR {base}")
+            out.append(f"#define {name}_MD_SIZE {len(words)}  /* words, 3 per MD location: exp, mh, ml */")
+            out.append("")
+            out.append(_emit_array(f"{name}_md", "uint16_t", words, _oct16, per_line=3))
         out.append("")
 
     out.append(f"#endif /* {guard} */")

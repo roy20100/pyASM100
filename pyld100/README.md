@@ -109,14 +109,19 @@ out-of-scope features, or targeting a format that doesn't apply here.
   isn't converted to MD output. `asm2lm.py --vtype 4` expects a pre-packed
   IBM System/360 hex float, a different encoding with no grounded mapping
   found from the AP-internal one — `psmd.py` refuses rather than guess.
-- **`$COMMON` base-address assignment** (`psmd.py`'s `assign_common_bases`,
-  matching blocks by name across modules) is inferred by analogy to how
-  `$ENTRY`/`$EXT` symbols are matched, not confirmed against real APLOAD
-  source — `DTALNK`'s own table-building logic reads from the
-  non-portable `DBLUN` scratch format (see "Where this comes from").
+- **`$COMMON` base-address assignment across modules** (`psmd.py`'s
+  `assign_common_bases`, matching blocks by name) is inferred by analogy
+  to how `$ENTRY`/`$EXT` symbols are matched, not confirmed against real
+  APLOAD source — `DTALNK`'s own table-building logic reads from the
+  non-portable `DBLUN` scratch format (see "Where this comes from"). This
+  is still open even though matching a `$DATA` record to *its own
+  module's* `$COMMON` block is now solid (see Testing) — nothing has
+  exercised two modules sharing one named block yet.
 - **TYPEN 1 and 3** (self-relocation, DB/common reference) are implemented
-  from the grounded `LINKUP`/`DTAREL` source but, like the `$COMMON` point
-  above, unverified against real data.
+  from the grounded `LINKUP`/`DTAREL` source but, like the cross-module
+  point above, unverified against real data — nothing in any assembled
+  test source so far has a `***CODE` word that references a `$COMMON`
+  block or its own module's load address.
 - Explicitly out of scope, matching `pyasm100`'s and APLOAD's own
   boundaries: overlays, `$TASK`/`$ISR`, library search mode (treating an
   `.APO` file as a searchable archive rather than a plain object file),
@@ -142,13 +147,22 @@ is layered:
   dropping `SYMLIB.APO` correctly raises on the first missing external.
 - **`psmd.py` + CLI**: the real-data path (PS) was run through the actual
   CLI and its output fed straight into the unmodified `asm2lm.py`,
-  accepted without error. The `$COMMON`/`$DATA` path (MD), which no real
-  file exercises, was checked with a hand-built fixture (mixed
-  integer/relocated/real elements) resolving to the expected addresses
-  and values, with both resulting MD texts likewise accepted by
-  `asm2lm.py`.
+  accepted without error. `$COMMON`/`$DATA` (MD) was *also* checked
+  against real assembled source, not just a hand-built fixture: assembling
+  `$COMMON /MYBLK/ SYM1/R,SYM2/I` / `$DATA SYM1 1.5,SYM2 -2` with
+  `pyasm100` (0 errors — see `pyasm100/USAGE.md`'s worked example) and
+  linking the result resolved to the right addresses and values, with the
+  MD text accepted by `asm2lm.py`. This caught a real bug: a `***DBIB`
+  record's `id` field is *not* the same number as its `***DBDB` block's
+  `id` field (the latter is always the literal `3` symbol-kind tag every
+  `$COMMON` name gets, useless for telling blocks apart) — a record's
+  block is actually identified by *position*, a 1-based counter of
+  `$COMMON` blocks in the order they're declared in that module. Fixed in
+  `relocate_data`; `objfile.py`'s `CommonBlock.id`/`DataRecord.id` fields
+  are unchanged (still parsed correctly) but shouldn't be compared to each
+  other for anything.
 
-`TYPEN 1`/`3`/`4` and the triple-`$DATA` path remain unverified against
-real data — see "Known gaps." If a real linked reference (or a `.APO`
-file with `$COMMON`/`$DATA`/self-relocation) ever turns up, diff against
-it the same way `APFLIB.APO` validated `pyasm100`.
+`TYPEN 1`/`3`/`4`, the triple-`$DATA` path, and cross-module `$COMMON`
+matching remain unverified against real data — see "Known gaps." If a
+real linked reference (or a `.APO` file exercising any of those) ever
+turns up, diff against it the same way `APFLIB.APO` validated `pyasm100`.

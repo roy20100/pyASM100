@@ -78,6 +78,7 @@ parsing even begins — see `pass1.py`'s `&LIB`/`&ENDLIB` handling).
 | `$FP value` | Emits a floating-point literal, converted via the FPGET/RTOE machinery (see `fpget.py`/`rtoe.py`). |
 | `$END` | Ends the current module, flushing final tables and switching to the next `$TITLE` (or end of file). |
 | `$EXT name[,name...]` | Declares external symbol references this module needs resolved at link time. |
+| `$INTEGER`/`$REAL`/`$TRIPLE name[,name...]` | Declares a list of symbols as integer/real/triple type — structurally the same mechanism as `$EXT` above (`pass1.py` routes all four through one shared handler, distinguished only by a type tag), so most likely a way to pre-declare `$COMMON` members' types outside the `$COMMON` line itself, as an alternative to the inline `/I`/`/R`/`/T` suffix below. Not independently verified by assembly, unlike `$COMMON`/`$DATA`. |
 | `$INSERT` | Switches to reading from an inserted/included secondary input stream. |
 | `$IF expr` / `$ENDIF` | Conditional assembly: if `expr` evaluates to 0, everything up to the matching `$ENDIF` is skipped. |
 | `$BOX` / `$ENDBOX` | Brackets a region skipped on some condition (box/skip-scan region — see `pass1.py`'s box handling for the exact trigger). |
@@ -85,9 +86,8 @@ parsing even begins — see `pass1.py`'s `&LIB`/`&ENDLIB` handling).
 | `$RADIX n` | Sets the default numeral radix (8, 10, or 16) for suffix-less numbers, for the rest of the module. |
 | `$PAGE` | Forces a page break in the listing. |
 | `$LIST` / `$NOLIST` | Turns listing output on/off for the following lines. |
-| `$INTEGER` / `$REAL` / `$TRIPLE` | Set the element type for subsequent `$DATA` entries (16-bit integer, RTOE-normalized real, or AP triple-precision). |
-| `$COMMON name` | Declares/opens a named data block (`***DBDB` in the object file) — the AP-side shared-data area `pyld100`'s `TYPEN 3` relocation resolves. |
-| `$DATA v1[,v2...]` | Emits initialized data elements (`***DBIB`) into the current `$COMMON` block, in whatever type `$INTEGER`/`$REAL`/`$TRIPLE` last set. |
+| `$COMMON /name/ sym[(count)][/I\|R\|T][,sym2...]` | Declares/opens a named data block (`***DBDB` in the object file) — the AP-side shared-data area `pyld100`'s `TYPEN 3` relocation resolves. Each member gets an optional element count in `(...)` and an optional one-letter type — `I` integer (default), `R` real, `T` triple — after a `/`. Bare `$COMMON` (no `/name/`) opens the anonymous `.BLANK` block. Confirmed by actually assembling `$COMMON /MYBLK/ SYM1/R,SYM2/I` (0 errors) — see the worked example below. |
+| `$DATA sym value[,sym2 value2...]` | Emits initialized data elements (`***DBIB`) for members of the currently open `$COMMON` block, referenced **by name**, in whatever type that member was declared with — *not* a bare positional value list (an earlier version of this table guessed wrong; confirmed by actually assembling `$DATA SYM1 1.5,SYM2 -2` against the block above, 0 errors). `sym(index)` addresses one element of a multi-element member. |
 | `$COMIO` | Declares a `$COMMON` block as connected to host I/O (from the name — exact host-side contract not independently verified; see the root README's "no independent oracle" note). |
 | `$PARAM` | Declares a formal parameter for a HASI-callable entry (from the name and its relation to `pyld100`'s unimplemented `TYPEN 4`; see `pyld100/relocate.py`'s docstring — not independently verified). |
 | `$CALL` | Source-level call declaration (distinct from `LOD100`'s own link-time `CALL` command, which generates the HASI stub — see `pyld100/README.md`'s "Where this comes from" section). Exact contract not independently verified. |
@@ -211,3 +211,30 @@ root README) inherited RSX-11's small fixed-width filename buffers, so a
 long path (e.g. deep in a temp directory) gets silently rejected and the
 prompt just repeats instead of erroring clearly — run from a directory
 close to the file, or use short relative paths.
+
+## A $COMMON/$DATA example
+
+`$COMMON`/`$DATA` (verified the same way — actually assembled, 0 errors,
+then linked with `pyld100` and converted with `ps_md_to_c.py`):
+
+```
+$TITLE DEMO3
+$COMMON /MYBLK/ SYM1/R,SYM2/I
+$DATA SYM1 1.5,SYM2 -2
+$END
+```
+
+This produces one `***DBDB` block (`MYBLK`, one real element and one
+integer element) and two `***DBIB` records. Link it —
+
+```
+py -3.11 -m pyld100 demo3.apo -o demo3linked
+```
+
+— and, since the module has no code, `pyld100` writes an empty
+`demo3linked.ps` plus `demo3linked.md1` (`SYM2`'s integer, `-2`) and
+`demo3linked.md2` (`SYM1`'s real, RTOE-normalized text). Convert either
+to a C header with `ps_md_to_c.py`; `--vtype 2` output is 3
+`uint16_t` words per value (the AP-120B's own native exponent/high-
+mantissa/low-mantissa float, not a C `double` — see that script's own
+docstring) so it can be DMA'd straight into AP memory.

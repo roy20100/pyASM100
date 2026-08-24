@@ -78,10 +78,19 @@ def relocate_data(
     """Resolve every DataRecord's address and relocatable value into a
     flat list of MdEntry, applying compute_val() (is_data=True, so no
     PC-relative adjustment -- DTAREL never does that either) for any
-    record whose type carries the +16 relocatable flag."""
+    record whose type carries the +16 relocatable flag.
+
+    DataRecord.id is NOT CommonBlock.id -- confirmed empirically (see
+    git history): a ***DBDB header's id field is always the literal "3"
+    symbol-kind tag pass1.py stamps on every $COMMON name (constant,
+    useless for telling blocks apart), while a ***DBIB record's id field
+    is pass1.py's `comcnt` -- a 1-based counter of $COMMON blocks in the
+    order they were declared in that module. So a module's data records
+    are matched against its common_blocks list by *position*, not by
+    comparing id fields."""
     common_index: dict[int, dict[int, str]] = {}
     for m in modules:
-        common_index[id(m)] = {cb.id: cb.name.strip() for cb in m.common_blocks}
+        common_index[id(m)] = {i + 1: cb.name.strip() for i, cb in enumerate(m.common_blocks)}
 
     out: list[MdEntry] = []
     for m in modules:
