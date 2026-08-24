@@ -9,6 +9,10 @@ ported ``/`` on INTEGER operands goes through ``fdiv`` rather than ``//``.
 
 from __future__ import annotations
 
+import math
+
+from .bitops import to_signed16
+
 
 def fdiv(a: int, b: int) -> int:
     q = abs(a) // abs(b)
@@ -41,3 +45,27 @@ def pflt(x: int) -> float:
     FNUM=FNUM+65536.0 idiom -- used after a value has already been
     made non-negative, e.g. by FLOAT2's NEGCHK/INEG16 dance)."""
     return float(x & 0xFFFF)
+
+
+def isub16(a: int, b: int) -> int:
+    """16-bit two's-complement subtract, wrapped (GVAL's '-' operator)."""
+    return to_signed16(a - b)
+
+
+def icmp16(a: int, b: int) -> int:
+    """Signed 16-bit compare: 0 if equal, else the sign of a-b (+/-1).
+    GVAL only ever tests the ==0 case (division-by-zero and the '='
+    operator); the sign is a reasonable general compare, not load-bearing
+    anywhere in the source."""
+    d = to_signed16(a) - to_signed16(b)
+    if d == 0:
+        return 0
+    return 1 if d > 0 else -1
+
+
+def ipfix(x: float) -> int:
+    """FIX (truncate-toward-zero) a REAL to a 16-bit two's-complement
+    INTEGER, wrapping on overflow -- GVAL's '*'/'/'  comment notes
+    "LOW ORDER BITS LOST ON BIG ONES", i.e. this wraps rather than
+    saturates."""
+    return to_signed16(math.trunc(x))
