@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+
+# Found FPS source archive -- large, and already available elsewhere;
+# not part of this port's own deliverable.
+FPS-SW/
